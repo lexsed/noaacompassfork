@@ -196,7 +196,7 @@ window.addEventListener('resize', function(event){
   drawMagneticAnomaly();
   drawCompass();
   drawCompassLabels();
-  drawHelpButton();
+  
   
   //Compass is abit problematic readjusting it twice
   adjustCompass();
@@ -880,8 +880,8 @@ function drawCompassLabels() {
     else
         direction = "N";
 
-    var trueText = direction + " " + Math.round(deg,1) + "°";
-    magnetDeg =  Math.round(deg -currentMagneticDec, 1) % 360;
+    var trueText = direction + " " + Math.round(deg*10)/10 + "°";
+    magnetDeg =  Math.round(((deg -currentMagneticDec)* 10)/10) % 360;
     if(magnetDeg < 0)
        magnetDeg = (magnetDeg + 360) % 360;
     var magneticText = magnetDeg + "°";
