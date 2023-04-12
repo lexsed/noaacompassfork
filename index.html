@@ -859,7 +859,7 @@ function drawCompassLabels() {
     var scaleHeight = 250;
 
 
-    var deg = (currentOutsideCompassAngle+ 360) %360;
+    var deg = (currentOutsideCompassAngle + 360) %360;
     if(Math.round(deg) >= 360)
        deg = 0;
     var direction = "";
@@ -881,7 +881,7 @@ function drawCompassLabels() {
         direction = "N";
 
     var trueText = direction + " " + (Math.round(deg*10)/10).toFixed(1) + "°";
-    magnetDeg =  Math.round(((deg -currentMagneticDec)* 10)/10) % 360;
+    magnetDeg =  deg -currentMagneticDec % 360;
     //if(magnetDeg < 0)
     magnetDeg = (magnetDeg + 360) % 360;
     var magneticText = magnetDeg.toFixed(1) + "°";
