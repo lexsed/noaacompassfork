@@ -1,0 +1,1052 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!-- DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"  "http://www.w3.org/TR/html40/loose.dtd" -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>Mobile Compass</title>
+    <link rel="shortcut icon" href="https://www.ngdc.noaa.gov/favicon.ico">
+    <meta name="author" content="National Centers for Environmental Information (NCEI)">
+    <meta name="operator" content="ncei.info@noaa.gov">
+    <meta name="questions" content="geomag.models">
+    <meta name="return" content="geomag">
+   
+   <script src="Mobile%20Compass_files/newGeomag.js"></script>
+
+    <style>
+        html {
+            height: 100%;
+            -webkit-background-size: cover;
+            -moz-background-size: cover;
+            -o-background-size: cover;
+            background-size: cover;
+            background: black;
+            /* For browsers that do not support gradients */
+            background: -webkit-linear-gradient(black, rgba(0, 42, 67, 1));
+            /* For Safari 5.1 to 6.0 */
+            background: -o-linear-gradient(black, rgba(0, 42, 67, 1));
+            /* For Opera 11.1 to 12.0 */
+            background: -moz-linear-gradient(black, rgba(0, 42, 67, 1));
+            /* For Firefox 3.6 to 15 */
+            background: linear-gradient(black, rgba(0, 42, 67, 1));
+            /* Standard syntax (must be last) */
+             background-attachment: fixed;
+        }
+
+
+    </style>
+</head>
+
+<body id="body" style="margin: 0px auto; height: 98%; text-align: center; width: 39.3672%;">
+
+   <table id="main_table" width="100%" height="100%">
+      <tbody><tr height="25%">
+         <td width="49%">
+            <canvas id="latlonCanvas" style="width:100%;height:100%;" width="180" height="81"></canvas>
+         </td>
+         <td style=" position: relative; " width="2%">
+            <div id="compasspointer" style="position: absolute; right: 50%; bottom: 5.2975px; background-color: white; width: 1.6626px; height: 21.19px; margin-right: -0.8313px;"></div>
+         </td>
+         <td width="49%">
+            <canvas id="magneticAnomalyCanvas" style="width:100%;height:100%;" width="180" height="81"></canvas>
+         </td>
+      </tr>
+      <tr height="50%">
+         <td colspan="3" style="text-align: center; ">
+            <canvas id="compass" style="height: 100%; width: 163px; margin-top: -24.45px;" width="163" height="163"></canvas>
+         </td>
+      </tr>
+      <tr height="25%">
+         <td colspan="3">
+            <table width="100%" height="100%">
+               <tbody><tr height="50%">
+                  <td width="10%"> </td>
+                  <td width="70%"> <canvas id="compassLabels" style="width:100%;height:100%;" width="252" height="74"></canvas> </td>
+                  <td style=" position: relative; " width="12%"> 
+                    
+                </td>
+                   <td width="8%"> </td>
+               </tr>
+            </tbody></table>
+         </td>
+      </tr>
+   </tbody></table>
+	<button id="sensors_button" onclick="requestSensorPremissions()" type="button" style="margin: auto; width: 300px; height: 120px; font-size : 40px; display :none">Activate sensors </button>
+
+
+<script>
+
+var UND = -9999;
+var degtorad = Math.PI / 180;
+var redtodeg =  180 / Math.PI;
+
+var stormCurrentPos = .5;
+var stormDestPos = .5;
+var stormCurrentR = 128;
+var stormCurrentG = 128;
+var stormCurrentB = 128;
+var stormDestR = stormCurrentR;
+var stormDestG = stormCurrentG;
+var stormDestB = stormCurrentB;
+
+var anamCurrentPos = .5;
+var anamDestPos = .5;
+var anamCurrentR = 128;
+var anamCurrentG = 128;
+var anamCurrentB = 128;
+var anamDestR = anamCurrentR;
+var anamDestG = anamCurrentG;
+var anamDestB = anamCurrentB;
+
+var bubbleX = 250;
+var bubbleY =250;
+
+var totalIntensity = UND;
+var magnetValue = UND;
+var prevT = 0;
+
+var LIGHT_BLUE = 'rgb(81, 181, 229)';
+var currentOutsideCompassAngle = 0;
+var destOutsideCompassAngle = 0; 
+
+var declination = 0;
+var currentMagneticDec = 0;
+
+var currentBubbleX = 0;
+var currentBubbleY = 0;
+var destBubbleX = 0;
+var destBubbleY = 0;
+
+var helpHovered = false;
+var alerted = false;
+var registeredhelp = false;
+
+var isAndroid = false; 
+var latitude = null;
+var longitude = null;
+
+hideOrShowSensorsButton();
+isAndroidCalc();
+adjustForLandScape();
+adjust();
+
+drawMagneticAnomaly();
+drawCompass();
+drawCompassLabels();
+//calcMagneticStorm();
+getLocation();
+drawLatLon();
+
+function hideOrShowSensorsButton(){
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission()
+        .then(permissionState => {
+
+if (permissionState === 'granted') {
+} else {
+ alert("Sensors premission declined, please clear web history in settings and grant premission for the application");
+}
+  var sensorsButton = document.getElementById("sensors_button");
+        sensorsButton.style.display = 'none';
+         var mainTable = document.getElementById("main_table");
+        mainTable.style.height = "100%";
+
+        })
+	.catch(error =>{
+	
+	 var sensorsButton = document.getElementById("sensors_button");
+	sensorsButton.style.display = 'block';
+	 var mainTable = document.getElementById("main_table");
+	mainTable.style.height = "90%";
+	});
+  } 
+}
+
+function requestSensorPremissions(){
+if (typeof DeviceMotionEvent.requestPermission === 'function') {
+	DeviceMotionEvent.requestPermission()
+.then(response => {
+ 	hideOrShowSensorsButton();
+})
+}
+}
+function isAndroidCalc() {
+  var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    if (/android/i.test(userAgent)) {
+        isAndroid = true;
+    }
+}
+
+function adjustForLandScape(){
+  if(window.innerWidth > window.innerHeight){
+      var percent = window.innerHeight/window.innerWidth;
+      if(percent < .7)
+         document.getElementById("body").style.width =   (110* percent) + "%";
+      else 
+         document.getElementById("body").style.width =   "100%";
+   } else {
+        document.getElementById("body").style.width =   "100%";
+   }
+}
+
+window.addEventListener('resize', function(event){
+ //Fixing things up on resize
+  adjustForLandScape();
+  adjust();
+  //drawMagneticStorm();
+  drawLatLon();
+  drawMagneticAnomaly();
+  drawCompass();
+  drawCompassLabels();
+  drawHelpButton();
+  
+  //Compass is abit problematic readjusting it twice
+  adjustCompass();
+  drawCompass();
+});
+
+function degreesToRads(degrees){
+ return  degrees * degtorad;
+}
+
+function radiansToDegs(radians){
+  return  radians * redtodeg;
+}
+
+function adjustCompass(){
+  var compass = document.getElementById('compass');
+   compass.width = 0;
+   compass.height = 0;
+   compass.style.height = "100%";
+   compass.style.width = compass.offsetHeight + "px";
+
+}
+
+function adjust(){
+   var storm = document.getElementById('latlonCanvas');
+   storm.width = 0;
+   storm.height = 0;
+   var anomaly = document.getElementById('magneticAnomalyCanvas');
+   anomaly.width = 0;
+   anomaly.height = 0;
+   adjustCompass();
+   var compassLabels = document.getElementById('compassLabels');
+   compassLabels.width = 0;
+   compassLabels.height = 0;
+
+}
+
+function drawTextAlongArc(context, str, centerX, centerY, radius, spanAngle, startAngle) {
+    var len = str.length,s;
+    context.save();
+    context.translate(centerX, centerY);
+    context.rotate(-1 * startAngle + .5 * Math.PI);
+    context.rotate(-1 * (spanAngle / len));
+    for (var n = 0; n < len; n++) {
+        context.rotate(spanAngle / len);
+        context.save();
+        context.translate(0, -1 * radius);
+        s = str[n];
+        context.fillText(s, 0, 0);
+        context.restore();
+    }
+    context.restore();
+}
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(calcWMM, errorLoc);
+    } else {
+        alert("Error getting location, can't calculate declination");
+    }
+}
+
+function errorLoc(){
+ alert("Error getting location, can't calculate declination");
+}
+
+
+function calcWMM(position) {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+            var newGeomag = new Geomag(xhr.responseText)
+            var geoMag = newGeomag.mag;
+            myGeoMag = geoMag(position.coords.latitude, position.coords.longitude, position.coords.altitude / 1000.0);
+            totalIntensity = myGeoMag.ti;
+            declination = myGeoMag.dec;
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+            drawLatLon();
+        }
+    }
+    xhr.open('GET', 'mobileStatic/WMM.COF', true);
+    xhr.send(null); 
+    latitude = position.coords.latitude;
+    longitude = position.coords.longitude;
+    //calcMagneticStorm();   
+}
+
+
+function getKIndex(data) {
+	
+    var startIndex = 64;
+	
+    if(latitude != null){
+	if(Math.abs(latitude) > 55)
+	  startIndex = 40;
+	else 
+	  startIndex = 17;  
+   }
+
+    var hour6val = -1;
+    var hour3val = -1;
+    var newPos = -1;
+    var now = new Date();
+    var utc6 = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    utc6.setHours(utc6.getHours() - 6);
+    var utc3 = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    utc3.setHours(utc3.getHours() - 3);
+    // Typical action to be performed when the document is ready:
+    lines = data.data.split("|");
+    for (ind in lines) {
+        line = lines[ind];
+        var year = parseInt(line.substring(0, 4))
+        var month = parseInt(line.substring(5, 7));
+        var day = parseInt(line.substring(8, 10));
+        if (isNaN(year) || isNaN(month) || isNaN(day))
+            //Not a data line
+            continue;
+	if (utc6.getFullYear() == year && (utc6.getMonth() + 1) == month && utc6.getDate() == day) {
+            var index = startIndex + (Math.floor(utc6.getHours() / 3)) * 2;
+            var endIndex = index +2;
+            if (startIndex >= 64) {
+                index = startIndex  + (Math.floor(utc6.getHours() / 3)) * 6;
+                endIndex = index + 5;
+           }
+            hour6val = parseFloat(line.substring(index, endIndex).trim());
+        }
+        if (utc3.getFullYear() == year && (utc3.getMonth() + 1) == month && utc3.getDate() == day) {
+              var index = startIndex + (Math.floor(utc3.getHours() / 3)) * 2;
+            var endIndex = index +2;
+            if (startIndex >= 64) {
+                index = startIndex  + (Math.floor(utc3.getHours() / 3)) * 6;
+                endIndex = index + 5;
+           }
+
+            hour3val = parseFloat(line.substring(index, endIndex).trim());
+    	}
+    }
+    if (!isNaN(hour3val) && hour3val >= -0.05) {
+        newPos = hour3val / 9.0;
+    } else if (!isNaN(hour6val) && hour6val >= -0.05) {
+        newPos = hour6val / 9.0;
+    }
+
+    if (newPos != -1) {
+        stormDestPos = newPos;
+        if (stormDestPos < .45) {
+            //Green
+            stormDestR = 0;
+            stormDestG = 255;
+            stormDestB = 0;
+        } else if (stormDestPos > .55) {
+            //Red
+            stormDestR = 255;
+            stormDestG = 0;
+            stormDestB = 0;
+        } else {
+            //Yellow
+            stormDestR = 255;
+            stormDestG = 255;
+            stormDestB = 0;
+        }
+    }
+}
+
+/*
+function calcMagneticStorm() {
+    var script = document.createElement('script');
+    script.src = 'https://minsqlindex.appspot.com/kindexservlet?callback=getKIndex'
+    document.getElementsByTagName('head')[0].appendChild(script);
+}
+*/
+
+function update(currentTime){
+   var deltaTime = (currentTime - prevT)/1000.0;
+   if(deltaTime > .2)
+	deltaTime = 0;
+   //updateMagneticStorm(deltaTime);
+   updateMagneticAnomaly(deltaTime);
+   updateCompass(deltaTime);
+   prevT = currentTime;
+   window.requestAnimationFrame(update);
+}
+window.requestAnimationFrame(update);
+
+//This will be based on unit circle based system
+function drawArc(context, centerX, centerY, radius, startAngle, endAngle, counterclockwise = false) {
+    context.beginPath();
+    context.arc(centerX, centerY, radius, -1 * startAngle, -1 * endAngle, counterclockwise);
+    context.stroke();
+}
+
+function updateCompass(t) {
+    redrawCompass = false;
+
+    var rot = t * Math.abs(declination - currentMagneticDec);
+
+    if (currentMagneticDec < declination) {
+        currentMagneticDec += rot;
+        if (currentMagneticDec > declination)
+            currentMagneticDec = declination;
+        redrawCompass = true;
+    } else if (currentMagneticDec > declination) {
+        currentMagneticDec -= rot;
+        if (currentMagneticDec < declination)
+            currentMagneticDec = declination;
+        redrawCompass = true;
+    }
+
+    var rot = t * Math.abs(destOutsideCompassAngle - currentOutsideCompassAngle);
+
+    if (currentOutsideCompassAngle < destOutsideCompassAngle) {
+        currentOutsideCompassAngle += rot;
+        if (currentOutsideCompassAngle > destOutsideCompassAngle)
+            currentOutsideCompassAngle = destOutsideCompassAngle;
+        redrawCompass = true;
+    } else if (currentOutsideCompassAngle > destOutsideCompassAngle) {
+        currentOutsideCompassAngle -= rot;
+        if (currentOutsideCompassAngle < destOutsideCompassAngle)
+            currentOutsideCompassAngle = destOutsideCompassAngle;
+        redrawCompass = true;
+    }
+
+  var move = t * Math.abs(destBubbleX - currentBubbleX) * 5;
+  if (currentBubbleX < destBubbleX) {
+      currentBubbleX += move;
+      if (currentBubbleX > destBubbleX)
+          currentBubbleX = destBubbleX;
+      redrawCompass = true;
+  } else if (currentBubbleX > destBubbleX) {
+      currentBubbleX -= move;
+      if (currentBubbleX < destBubbleX)
+          currentBubbleX = destBubbleX;
+      redrawCompass = true;
+  }
+
+
+  move = t * Math.abs(destBubbleY - currentBubbleY) * 5;
+  if (currentBubbleY < destBubbleY) {
+      currentBubbleY += move;
+      if (currentBubbleY > destBubbleY)
+          currentBubbleY = destBubbleY;
+      redrawCompass = true;
+  } else if (currentBubbleY > destBubbleY) {
+      currentBubbleY -= move;
+      if (currentBubbleY < destBubbleY)
+          currentBubbleY = destBubbleY;
+      redrawCompass = true;
+  }
+
+    if (redrawCompass) {
+        drawCompass();
+        drawCompassLabels();
+    }
+}
+
+function updateMagneticAnomaly(t) {
+    if (totalIntensity == UND || magnetValue == UND)
+        return;
+
+    var val = (((((magnetValue - totalIntensity) / totalIntensity) * 2) + 1) / 2);
+    if (val > 1)
+        val = 1;
+    else if (val < 0)
+        val = 0;
+
+    anamDestPos = val;
+
+    if (anamDestPos >= .9 || anamDestPos <= .1) {
+        //Red
+        anamDestR = 255;
+        anamDestG = 0;
+        anamDestB = 0;
+    } else if (anamDestPos >= .75 || anamDestPos <= .25) {
+        //Orange
+        anamDestR = 255;
+        anamDestG = 191;
+        anamDestB = 0;
+    } else {
+        //Green
+        anamDestR = 0;
+        anamDestG = 255;
+        anamDestB = 0;
+    }
+
+    var speed = t/3;
+    var updatePos = true;
+    if (anamCurrentPos < anamDestPos) {
+        anamCurrentPos += speed;
+        if (anamCurrentPos > anamDestPos) {
+            anamCurrentPos = anamDestPos;
+        }
+    } else if (anamCurrentPos > anamDestPos) {
+        anamCurrentPos -= speed;
+        if (anamCurrentPos < anamDestPos) {
+            anamCurrentPos = anamDestPos;
+        }
+    } else {
+        updatePos = false;
+    }
+
+    var colorSpeed = t*50;
+    var updateColor = false;
+
+    if (anamCurrentR < anamDestR) {
+        anamCurrentR += colorSpeed;
+        if (anamCurrentR > anamDestR) {
+            anamCurrentR = anamDestR;
+        }
+        updateColor = true;
+    } else if (anamCurrentR > anamDestR) {
+        anamCurrentR -= colorSpeed;
+        if (anamCurrentR < anamDestR) {
+            anamCurrentR = anamDestR;
+        }
+        updateColor = true;
+    }
+
+    if (anamCurrentG < anamDestG) {
+        anamCurrentG += colorSpeed;
+        if (anamCurrentG > anamDestG) {
+            anamCurrentG = anamDestG;
+        }
+        updateColor = true;
+    } else if (anamCurrentG > anamDestG) {
+        anamCurrentG -= colorSpeed;
+        if (anamCurrentG < anamDestG) {
+            anamCurrentG = anamDestG;
+        }
+        updateColor = true;
+    }
+
+    if (anamCurrentB < anamDestB) {
+        anamCurrentB += colorSpeed;
+        if (anamCurrentB > anamDestB) {
+            anamCurrentB = anamDestB;
+        }
+        updateColor = true;
+    } else if (anamCurrentB > anamDestB) {
+        anamCurrentB -= colorSpeed;
+        if (anamCurrentB < anamDestB) {
+            anamCurrentB = anamDestB;
+        }
+        updateColor = true;
+    }
+
+    if (updatePos || updateColor) {
+        drawMagneticAnomaly();
+    }
+}
+
+// draw current location
+function drawLatLon(){
+
+    var canvas = document.getElementById('latlonCanvas');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    context = canvas.getContext('2d');
+    context.fillStyle = 'white';
+    context.font = '16pt Calibri';
+    if (latitude != null && longitude != null) {
+        var lat = latitude.toFixed(6);
+        var lon = longitude.toFixed(6);
+        var now = new Date();
+        var utc6 = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+        context.fillText(utc6.toTimeString().substring(0,12), 10, 30);
+
+
+        context.fillText(lat + ' ' + lon, 10, 60);
+    } else {
+        context.fillText('No GPS', 10, 50);
+    }
+
+}
+
+
+function drawMagneticAnomaly() {
+    var canvas = document.getElementById('magneticAnomalyCanvas');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    context = canvas.getContext('2d');
+
+    //Base Dimensions will scale to fit the actual element
+    var scaleWidth = 550;
+    var scaleHeight = 400;
+    var xshift = 150;
+    var yshift = 50;
+    //Scaling to fit size of canvas
+    context.scale(canvas.width / scaleWidth, canvas.height / scaleHeight);
+    context.clearRect(0, 0, scaleWidth, scaleHeight);
+    centerX = xshift;
+    centerY = scaleHeight - yshift;
+    radius = Math.min(scaleWidth, scaleHeight) - Math.min(xshift, yshift) - 40;
+
+
+    
+    context.font = '66pt Calibri';
+    context.fillStyle = 'rgb(' + parseInt(anamCurrentR,10) + ',' + parseInt(anamCurrentG,10) + ',' + parseInt(anamCurrentB,10) +')';
+    context.strokeStyle = 'rgb(' + parseInt(anamCurrentR,10) + ',' + parseInt(anamCurrentG,10) + ',' + parseInt(anamCurrentB,10) +')';
+    context.textAlign = "center";
+    context.lineWidth = 4;
+    drawTextAlongArc(context, '|', centerX, centerY, radius - 80, 1, (anamCurrentPos/2) * Math.PI);
+
+    context.font = '36pt Calibri';
+    context.fillStyle = 'gray';
+    context.strokeStyle = 'gray';
+    context.textAlign = "center";
+    context.lineWidth = 4;
+    drawTextAlongArc(context, '|', centerX, centerY, radius - 50, 1, .25 * Math.PI);
+
+    context.font = '25pt Calibri';
+    context.fillStyle = 'white';
+    context.strokeStyle = 'white';
+    drawTextAlongArc(context, '   magnetic anomaly %   ', centerX, centerY, radius, .5 * Math.PI, .5 * Math.PI);
+
+    var radShift = 15;
+    // draw circle underneath text
+     context.lineWidth = 6;
+    drawArc(context, centerX, centerY, radius - radShift, .5 * Math.PI, 0);
+    context.textAlign = "left";
+    context.fillText("+50%", xshift * .38 + radShift, yshift * .98 + radShift);
+    context.fillText("-50%", scaleWidth - xshift *1.1, scaleHeight - yshift * .3);
+
+}
+
+function drawCompass() {
+    var canvas = document.getElementById('compass');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    context = canvas.getContext('2d');
+
+    var outsideCompassTriColor = 'rgb(0, 146, 61)';
+    var insideCompassTriColor = 'rgb(245, 130, 0)';
+    var bubbleColor = 'rgb(0, 174, 239)';
+    var outsideCompassColor = 'rgb(120, 178, 43)';
+    var insideCompassColor = 'rgb(215, 218, 39)';
+    var insideCircleColor = 'black';
+
+    var scaleWidth = 500;
+    var scaleHeight = 500;
+    var strokeWidth = 3;
+    var centerX = scaleWidth / 2;
+    var centerY = scaleHeight / 2;
+
+    var outsideCompassRadius = scaleWidth / 2 - strokeWidth;
+    var insideCompassRadius = outsideCompassRadius * .68;
+    var insideCircleRadius = outsideCompassRadius * .35;
+    var bubbleRadius = outsideCompassRadius * .04;
+    var bubbleRadiusPositionScalar = insideCircleRadius - bubbleRadius;
+    var lineLength = insideCircleRadius / .75;
+
+    //Scaling to fit size of canvas
+    context.scale(canvas.width / scaleWidth, canvas.height / scaleHeight);
+    context.clearRect(0, 0, scaleWidth, scaleHeight);
+
+    var compassPointer = document.getElementById('compasspointer');
+
+    var compassPointerHeight = (canvas.height / scaleHeight) * 65;
+    var compassPointerWidth = (canvas.width / scaleWidth) * strokeWidth * 1.7;
+
+    compassPointer.style.width = compassPointerWidth + 'px';
+    compassPointer.style.height = compassPointerHeight + 'px';
+    compassPointer.style.marginRight = '-' + compassPointerWidth / 2 + 'px';
+    compassPointer.style.bottom = compassPointerHeight * .25 + 'px';
+
+    canvas.style.marginTop = '-' + (canvas.height / scaleHeight) * 75 + 'px';
+
+
+    //Outside Compass
+
+    context.save();
+    context.translate(centerX, centerY);
+    context.rotate(degreesToRads(-currentOutsideCompassAngle));
+    context.translate(-centerX, -centerY);
+
+    context.lineWidth = strokeWidth;
+    context.fillStyle = outsideCompassColor;
+    context.strokeStyle = 'white';
+    context.arc(centerX, centerY, outsideCompassRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+
+    var widthOfTriangle = scaleWidth * 0.06;
+    var heightOfTraingle = scaleHeight * 0.08;
+    var x1 = centerX - widthOfTriangle;
+    var x2 = centerX + widthOfTriangle;
+    var x3 = centerX;
+
+    var y1 = centerY - outsideCompassRadius * .83;
+    var y2 = y1 - heightOfTraingle;
+
+    context.fillStyle = outsideCompassTriColor;
+    context.beginPath();
+    context.moveTo(x1, y1);
+    context.lineTo(x2, y1);
+    context.lineTo(x3, y2);
+    context.lineTo(x1, y1);
+    context.fill();
+    context.stroke();
+
+
+    context.font = '24pt Calibri';
+    context.fillStyle = 'white';
+    context.strokeStyle = 'white';
+    drawTextAlongArc(context, 'NESW', centerX, centerY, outsideCompassRadius * .85, 2 * Math.PI, .515 * Math.PI);
+
+    context.save();
+    context.translate(centerX, centerY);
+    context.rotate(degreesToRads(-2));
+    context.translate(-centerX, -centerY);
+
+    var outNumRad = outsideCompassRadius * .71;
+    context.font = '18pt Calibri';
+    drawTextAlongArc(context, '0', centerX, centerY, outNumRad, 0, .5 * Math.PI);
+
+    var doubleDigitAdjust = .04;
+    drawTextAlongArc(context, '45', centerX, centerY, outNumRad, .05 * Math.PI, .25 * Math.PI + doubleDigitAdjust);
+    drawTextAlongArc(context, '90', centerX, centerY, outNumRad, .05 * Math.PI, 0 + doubleDigitAdjust);
+
+    var tripleDigitAdjust = .07
+    drawTextAlongArc(context, '135', centerX, centerY, outNumRad, .07 * Math.PI, 1.75 * Math.PI + tripleDigitAdjust);
+    drawTextAlongArc(context, '180', centerX, centerY, outNumRad, .07 * Math.PI, 1.5 * Math.PI + tripleDigitAdjust);
+    drawTextAlongArc(context, '225', centerX, centerY, outNumRad, .07 * Math.PI, 1.25 * Math.PI + tripleDigitAdjust);
+    drawTextAlongArc(context, '270', centerX, centerY, outNumRad, .07 * Math.PI, Math.PI + tripleDigitAdjust);
+    drawTextAlongArc(context, '315', centerX, centerY, outNumRad, .07 * Math.PI, .75 * Math.PI + tripleDigitAdjust);
+    context.restore();
+
+    context.save();
+    context.translate(centerX, centerY);
+    context.rotate(degreesToRads(currentMagneticDec));
+    context.translate(-centerX, -centerY);
+
+    //Inside Compass
+    context.beginPath();
+    context.fillStyle = insideCompassColor;
+    context.arc(centerX, centerY, insideCompassRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+
+    var widthOfTriangle = scaleWidth * 0.06;
+    var heightOfTraingle = scaleHeight * 0.08;
+    var x1 = centerX - widthOfTriangle;
+    var x2 = centerX + widthOfTriangle;
+    var x3 = centerX;
+
+    var y1 = centerY - insideCompassRadius * .760;
+    var y2 = y1 - heightOfTraingle;
+
+    context.fillStyle = insideCompassTriColor;
+    context.beginPath();
+    context.moveTo(x1, y1);
+    context.lineTo(x2, y1);
+    context.lineTo(x3, y2);
+    context.lineTo(x1, y1);
+    context.fill();
+    context.stroke();
+
+    context.font = '24pt Calibri';
+    context.fillStyle = 'white';
+    context.strokeStyle = 'white';
+
+
+    drawTextAlongArc(context, 'MESW', centerX, centerY, insideCompassRadius * .79, 2 * Math.PI, .53 * Math.PI);
+
+    context.save();
+    context.translate(centerX, centerY);
+    context.rotate(degreesToRads(-3.37));
+    context.translate(-centerX, -centerY);
+
+    var outNumRad = insideCompassRadius * .56;
+    context.font = '18pt Calibri';
+    drawTextAlongArc(context, '0', centerX, centerY, outNumRad, 0, .5 * Math.PI);
+
+    var doubleDigitAdjust = .07;
+    drawTextAlongArc(context, '90', centerX, centerY, outNumRad, .08 * Math.PI, 0 + doubleDigitAdjust);
+
+    var tripleDigitAdjust = .12;
+    drawTextAlongArc(context, '180', centerX, centerY, outNumRad, .12 * Math.PI, 1.5 * Math.PI + tripleDigitAdjust);
+    drawTextAlongArc(context, '270', centerX, centerY, outNumRad, .12 * Math.PI, Math.PI + tripleDigitAdjust);
+    context.restore();
+    context.restore();
+    context.restore();
+
+    //Arrow Arc
+    var sweepAngle = currentMagneticDec;
+    var angleShift = 4;
+    var counterclockwise = false;
+
+    context.font = '24pt Calibri';
+    var drawArrow = true;
+    var color;
+    if (Math.abs(sweepAngle) < angleShift) {
+        angleShift = 0;
+        drawArrow = false;
+    }
+
+    if (sweepAngle > 0) {
+        color = 'red';
+    } else {
+        color = LIGHT_BLUE;
+        counterclockwise = true;
+    }
+
+
+    context.lineWidth = strokeWidth;
+    context.strokeStyle = color;
+    context.fillStyle = color;
+    context.beginPath();
+    var startAngle = -currentOutsideCompassAngle - 90;
+    context.arc(centerX, centerY, insideCompassRadius, degreesToRads(startAngle), degreesToRads(startAngle + sweepAngle), counterclockwise);
+    context.stroke();
+    if (drawArrow) {
+        var arrowAngle = -(-currentOutsideCompassAngle - 90) - sweepAngle;
+        if (sweepAngle > 0)
+            drawTextAlongArc(context, '▸', centerX, centerY, insideCompassRadius * .94, 0, degreesToRads(arrowAngle+angleShift));
+        else
+            drawTextAlongArc(context, '◂', centerX, centerY, insideCompassRadius * .94, 0, degreesToRads(arrowAngle));
+    }
+
+
+
+    //Bubble
+    context.beginPath();
+    context.strokeStyle = 'white';
+    context.fillStyle = insideCircleColor;
+    context.arc(centerX, centerY, insideCircleRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+
+
+    context.fillStyle = 'white';
+    context.beginPath();
+
+    context.rect(centerX - strokeWidth / 2, centerY - lineLength / 2, strokeWidth, lineLength);
+    context.fill();
+
+    context.beginPath();
+
+    context.rect(centerX - lineLength / 2, centerY - strokeWidth / 2, lineLength, strokeWidth);
+    context.fill();
+
+    context.beginPath();
+    context.fillStyle = bubbleColor;
+    context.arc(centerX + bubbleRadiusPositionScalar * currentBubbleX, centerY + bubbleRadiusPositionScalar * currentBubbleY, bubbleRadius, 0, 2 * Math.PI);
+    context.fill();
+    context.stroke();
+
+}
+
+
+function drawCompassLabels() {
+    var canvas = document.getElementById('compassLabels');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    context = canvas.getContext('2d');
+
+    var trueDirectionColor = 'rgb(120, 178, 43)';
+    var magneticDirectionColor = 'rgb(215, 218, 39)';
+
+    var scaleWidth = 500;
+    var scaleHeight = 250;
+
+
+    var deg = (currentOutsideCompassAngle+ 360) %360;
+    if(Math.round(deg) >= 360)
+       deg = 0;
+    var direction = "";
+    if (deg > 22.5  && deg <= 67.5 )
+        direction = "NE";
+    else if (deg > 67.5  && deg <= 112.5 )
+        direction = "E";
+    else if (deg > 112.5  && deg <= 157.5 )
+        direction = "SE";
+    else if (deg > 157.5  && deg <= 202.5 )
+        direction = "S";
+    else if (deg > 202.5  && deg <= 247.5 )
+        direction = "SW";
+    else if (deg > 247.5  && deg <= 292.5 )
+        direction = "W";
+    else if (deg > 292.5  && deg <= 337.5 )
+        direction = "NW";
+    else
+        direction = "N";
+
+    var trueText = direction + " " + Math.round(deg) + "°";
+    magnetDeg =  Math.round(deg -currentMagneticDec);
+    if(magnetDeg < 0)
+       magnetDeg = magnetDeg + 360;
+    var magneticText = magnetDeg + "°";
+
+    var sign = "";
+    var color;
+    if(declination > 0){
+	color = 'salmon';
+	sign = "+";
+    } else {
+	color = LIGHT_BLUE;
+    }
+ 
+    var declinationText = sign + Math.round( declination * 10 ) / 10  + "°";
+    //Scaling to fit size of canvas
+    context.scale(canvas.width / scaleWidth, canvas.height / scaleHeight);
+    context.clearRect(0, 0, scaleWidth, scaleHeight);
+
+    context.textAlign = "center";
+    context.font = '36pt Calibri';
+    context.fillStyle = 'white';
+    context.fillText(trueText, 292, 42);
+
+    context.fillStyle = trueDirectionColor;
+    context.fillText(trueText, 290, 40);
+
+    context.fillStyle = 'white';
+    context.font = '18pt Calibri';
+    context.fillText("true direction", 290, 70);
+
+
+    context.font = '36pt Calibri';
+    context.fillStyle = 'white';
+    context.fillText(magneticText, 137, 172);
+
+    context.fillStyle = magneticDirectionColor;
+    context.fillText(magneticText, 135, 170);
+
+    context.fillStyle = 'white';
+    context.font = '18pt Calibri';
+    context.fillText("magnetic direction", 135, 200);
+
+  
+ context.font = '36pt Calibri';
+    context.fillStyle = 'white';
+    context.fillText(declinationText, 351, 172);
+
+    context.fillStyle = color;
+    context.fillText(declinationText, 350, 170);
+
+    context.fillStyle = 'white';
+    context.font = '18pt Calibri';
+    context.fillText("declination", 350, 200);
+
+
+
+}
+
+
+
+function setOutsideCompassAngle(angle) {
+    angle = (angle + 360) % 360;
+    currentOutsideCompassAngle = (currentOutsideCompassAngle + 360) % 360;
+    //Checking which angle path is closest
+    var lowAngle = angle - 360;
+    var highAngle = angle + 360;
+    var range1 = Math.abs(currentOutsideCompassAngle - lowAngle);
+    var range2 = Math.abs(currentOutsideCompassAngle - angle);
+    var range3 = Math.abs(currentOutsideCompassAngle - highAngle);
+
+    if (range1 < range2 && range1 < range3) {
+        destOutsideCompassAngle = lowAngle;
+    } else if (range2 < range1 && range2 < range3) {
+        destOutsideCompassAngle = angle;
+    } else {
+        destOutsideCompassAngle = highAngle;
+    }
+}
+
+function setBubbleCoord( x,  y) {
+    var rad =  Math.sqrt(x * x + y * y);
+    if (rad > 1)
+        rad = 1;
+
+    var angle = radiansToDegs(Math.atan(y / x));
+    if (x < 0 && y > 0) {
+        angle += 180;
+    } else if (x < 0 && y < 0) {
+        angle += 180;
+    }
+
+
+    destBubbleX = (rad * Math.cos(degreesToRads(angle)));
+    destBubbleY =  -(rad * Math.sin(degreesToRads(angle)));
+}
+
+
+
+function setCompassHeading(event){
+   if('webkitCompassHeading' in event) {
+      // Apple works only with this, alpha doesn't work
+     setOutsideCompassAngle(event.webkitCompassHeading + declination);  
+    }
+   else if(event.absolute){
+      setOutsideCompassAngle((360-event.alpha) + declination);
+  } else {
+    if(!alerted){
+       alerted = true;
+      alert("Not able to calculate compass heading, try a different browser");
+     }
+  }
+}
+
+
+
+
+if ('ondeviceorientationabsolute' in window) {
+  window.addEventListener("deviceorientationabsolute", function(event) {
+       setCompassHeading(event);
+      }, true);
+}else if ('ondeviceorientation' in window) {
+ window.addEventListener("deviceorientation", function(event) {
+       setCompassHeading(event);
+      }, true);
+} 
+
+if (typeof window.orientation != 'undefined') { 
+} else {
+   alerted = true;
+   alert("Current device does not support sensors, use a mobile platform for best results");
+}
+
+window.addEventListener("devicemotion", function(event) {
+     var accX = event.accelerationIncludingGravity.x / 9.8;
+     var accY = event.accelerationIncludingGravity.y / 9.8;
+     if (!isAndroid) {
+         accX = -accX;
+         accY = -accY;
+     }
+     //LandScapes
+     if (window.orientation == 90) {
+         var rep = accX;
+         accX = -accY;
+         accY = rep;
+     }
+
+     if (window.orientation == -90) {
+         var rep = accX;
+         accX = -accY;
+         accY = rep;
+         accX = -accX;
+         accY = -accY;
+     }
+
+     setBubbleCoord(accX, accY);
+ }, true);
+
+
+
+
+
+
+</script>
+
+
+
+
+</body></html>
