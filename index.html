@@ -880,11 +880,11 @@ function drawCompassLabels() {
     else
         direction = "N";
 
-    var trueText = direction + " " + Math.round(deg*10)/10 + "°";
+    var trueText = direction + " " + (Math.round(deg*10)/10).toFixed(1) + "°";
     magnetDeg =  Math.round(((deg -currentMagneticDec)* 10)/10) % 360;
-    if(magnetDeg < 0)
-       magnetDeg = (magnetDeg + 360) % 360;
-    var magneticText = magnetDeg + "°";
+    //if(magnetDeg < 0)
+    magnetDeg = (magnetDeg + 360) % 360;
+    var magneticText = magnetDeg.toFixed(1) + "°";
 
     var sign = "";
     var color;
